@@ -13,8 +13,8 @@ func ListInterfaces() error {
 	}
 
 	fmt.Println("Available Interfaces: ")
-	for _, device := range devices {
-		fmt.Printf("- %s (%s)\n", device.Name, device.Description)
+	for i, device := range devices {
+		fmt.Printf("[%d] %s (%s)\n", i, device.Name, device.Description)
 	}
 
 	return nil
