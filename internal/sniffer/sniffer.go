@@ -9,12 +9,19 @@ import (
 	"github.com/google/gopacket/pcap"
 )
 
-func Start(interfaceName string) {
+func Start(interfaceName, filter string) {
 	handle, err := pcap.OpenLive(interfaceName, 1600, true, pcap.BlockForever)
 	if err != nil {
-		log.Fatal("error opening devices: %v", err)
+		log.Fatalf("error opening devices: %v", err)
 	}
 	defer handle.Close()
+
+	if filter != "" {
+		if err := handle.SetBPFFilter(filter); err != nil {
+			log.Fatalf("failed to apply filter: %v", err)
+		}
+		fmt.Println("applied BPF filter:", filter)
+	}
 
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 
@@ -31,11 +38,18 @@ func processPacket(packet gopacket.Packet) {
 
 	timestamp := packet.Metadata().Timestamp.Format(time.RFC3339)
 
-	if networkLayer != nil && transportLayer != nil {
-		src, dst := networkLayer.NetworkFlow().Endpoints()
-		proto := transportLayer.LayerType().String()
-		fmt.Printf("[%s] %s | %s -> %s\n", timestamp, proto, src, dst)
-	} else {
-		fmt.Println("unknown packet format")
+	if networkLayer == nil || transportLayer == nil {
+		fmt.Println("[unknown] pakcet with missing layer")
+		return
 	}
+
+	src, dst := networkLayer.NetworkFlow().Endpoints()
+	protocol := transportLayer.LayerType()
+
+	length := packet.Metadata().Length
+	fmt.Printf("[%s] %s | %s -> %s | LEN: %d\n", timestamp, protocol, src, dst, length)
+
+	// if app := packet.ApplicationLayer(); app != nil {
+	// 	fmt.Println("Payload:", string(app.Payload()))
+	// }
 }
