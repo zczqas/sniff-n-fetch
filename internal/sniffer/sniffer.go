@@ -27,6 +27,13 @@ func Start(interfaceName, filter string) {
 
 	fmt.Println("starting packet capture...")
 
+	go func() {
+		for {
+			time.Sleep(5 * time.Second)
+			stats.Print()
+		}
+	}()
+
 	for packet := range packetSource.Packets() {
 		processPacket(packet)
 	}
@@ -39,12 +46,15 @@ func processPacket(packet gopacket.Packet) {
 	timestamp := packet.Metadata().Timestamp.Format(time.RFC3339)
 
 	if networkLayer == nil || transportLayer == nil {
+		stats.Update("Other")
 		fmt.Println("[unknown] pakcet with missing layer")
 		return
 	}
 
 	src, dst := networkLayer.NetworkFlow().Endpoints()
-	protocol := transportLayer.LayerType()
+	protocol := transportLayer.LayerType().String()
+
+	stats.Update(protocol)
 
 	length := packet.Metadata().Length
 	fmt.Printf("[%s] %s | %s -> %s | LEN: %d\n", timestamp, protocol, src, dst, length)
