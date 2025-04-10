@@ -28,9 +28,12 @@ func Start(interfaceName, filter string) {
 	fmt.Println("starting packet capture...")
 
 	go func() {
+		prevBytes := 0
+		interval := 5 * time.Second
+
 		for {
 			time.Sleep(5 * time.Second)
-			stats.Print()
+			stats.PrintRateAndPieChart(prevBytes, interval)
 		}
 	}()
 
@@ -42,8 +45,8 @@ func Start(interfaceName, filter string) {
 func processPacket(packet gopacket.Packet) {
 	networkLayer := packet.NetworkLayer()
 	transportLayer := packet.TransportLayer()
-
 	timestamp := packet.Metadata().Timestamp.Format(time.RFC3339)
+	length := packet.Metadata().Length
 
 	if networkLayer == nil || transportLayer == nil {
 		stats.Update("Other")
@@ -56,7 +59,6 @@ func processPacket(packet gopacket.Packet) {
 
 	stats.Update(protocol)
 
-	length := packet.Metadata().Length
 	fmt.Printf("[%s] %s | %s -> %s | LEN: %d\n", timestamp, protocol, src, dst, length)
 
 	// if app := packet.ApplicationLayer(); app != nil {
