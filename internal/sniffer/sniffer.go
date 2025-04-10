@@ -50,7 +50,7 @@ func processPacket(packet gopacket.Packet) {
 
 	if networkLayer == nil || transportLayer == nil {
 		stats.Update("Other")
-		fmt.Println("[unknown] pakcet with missing layer")
+		fmt.Println("[unknown] packet with missing layer")
 		return
 	}
 

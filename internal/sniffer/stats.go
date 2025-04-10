@@ -8,12 +8,13 @@ import (
 )
 
 type Stats struct {
-	Total int
-	TCP   int
-	UDP   int
-	ICMP  int
-	Other int
-	Bytes int
+	Total  int
+	TCP    int
+	UDP    int
+	ICMP   int
+	Other  int
+	Bytes  int
+	recent []packetEntry
 	sync.Mutex
 }
 
@@ -35,6 +36,26 @@ func (s *Stats) Update(proto string) {
 	default:
 		s.Other++
 	}
+}
+
+func (s *Stats) AddRecent(entry packetEntry) {
+	s.Lock()
+	defer s.Unlock()
+
+	if len(s.recent) >= 5 {
+		s.recent = s.recent[1:]
+	}
+	s.recent = append(s.recent, entry)
+}
+
+func (s *Stats) GetRecent() []packetEntry {
+	s.Lock()
+	defer s.Unlock()
+
+	// return a copy to avoid race conditions
+	copied := make([]packetEntry, len(s.recent))
+	copy(copied, s.recent)
+	return copied
 }
 
 func (s *Stats) PrintRateAndPieChart(prevBytes int, interval time.Duration) int {
