@@ -38,11 +38,11 @@ func (s *Stats) Update(proto string) {
 	}
 }
 
-func (s *Stats) AddRecent(entry packetEntry) {
+func (s *Stats) AddPacket(entry packetEntry) {
 	s.Lock()
 	defer s.Unlock()
 
-	if len(s.recent) >= 5 {
+	if len(s.recent) >= 10 {
 		s.recent = s.recent[1:]
 	}
 	s.recent = append(s.recent, entry)
@@ -63,7 +63,7 @@ func (s *Stats) PrintRateAndPieChart(prevBytes int, interval time.Duration) int 
 	defer s.Unlock()
 
 	rate := float64(s.Bytes-prevBytes) / interval.Seconds()
-	fmt.Printf("\n Stats | Total: %d | Rate: %.2f bytes/sec\n", s.Total, rate)
+	fmt.Printf("\nStats | Total: %d | Rate: %.2f bytes/sec\n", s.Total, rate)
 
 	total := float64(s.Total)
 	if total == 0 {

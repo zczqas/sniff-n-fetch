@@ -12,7 +12,7 @@ import (
 func Start(interfaceName, filter string) {
 	handle, err := pcap.OpenLive(interfaceName, 1600, true, pcap.BlockForever)
 	if err != nil {
-		log.Fatalf("error opening devices: %v", err)
+		log.Fatalf("error opening device: %v", err)
 	}
 	defer handle.Close()
 
@@ -26,14 +26,16 @@ func Start(interfaceName, filter string) {
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 
 	fmt.Println("starting packet capture...")
+	stats = &Stats{}
 
+	// Start stats display in a goroutine
 	go func() {
 		prevBytes := 0
 		interval := 5 * time.Second
 
 		for {
-			time.Sleep(5 * time.Second)
-			stats.PrintRateAndPieChart(prevBytes, interval)
+			time.Sleep(interval)
+			prevBytes = stats.PrintRateAndPieChart(prevBytes, interval)
 		}
 	}()
 
@@ -48,20 +50,48 @@ func processPacket(packet gopacket.Packet) {
 	timestamp := packet.Metadata().Timestamp.Format(time.RFC3339)
 	length := packet.Metadata().Length
 
-	if networkLayer == nil || transportLayer == nil {
-		stats.Update("Other")
-		fmt.Println("[unknown] packet with missing layer")
-		return
+	var protocol, src, dst string
+
+	if networkLayer == nil {
+		protocol = "Other"
+		src = "unknown"
+		dst = "unknown"
+	} else {
+		src = networkLayer.NetworkFlow().Src().String()
+		dst = networkLayer.NetworkFlow().Dst().String()
+
+		if transportLayer == nil {
+			protocol = "Other"
+		} else {
+			protocol = transportLayer.LayerType().String()
+		}
 	}
 
-	src, dst := networkLayer.NetworkFlow().Endpoints()
-	protocol := transportLayer.LayerType().String()
+	stats.Lock()
+	stats.Total++
+	stats.Bytes += length
 
-	stats.Update(protocol)
+	switch protocol {
+	case "TCP":
+		stats.TCP++
+	case "UDP":
+		stats.UDP++
+	case "ICMPv4", "ICMPv6":
+		stats.ICMP++
+	default:
+		stats.Other++
+	}
+	stats.Unlock()
+
+	entry := packetEntry{
+		Timestamp: timestamp,
+		Protocol:  protocol,
+		Src:       src,
+		Dst:       dst,
+		Length:    length,
+	}
+
+	stats.AddPacket(entry)
 
 	fmt.Printf("[%s] %s | %s -> %s | LEN: %d\n", timestamp, protocol, src, dst, length)
-
-	// if app := packet.ApplicationLayer(); app != nil {
-	// 	fmt.Println("Payload:", string(app.Payload()))
-	// }
 }
