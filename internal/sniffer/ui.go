@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
 )
 
@@ -20,13 +21,14 @@ type packetEntry struct {
 }
 
 type model struct {
-	width      int
-	height     int
-	stats      *Stats
-	prevBytes  int
-	bytesRate  float64
-	lastUpdate time.Time
-	quitting   bool
+	width         int
+	height        int
+	stats         *Stats
+	prevBytes     int
+	bytesRate     float64
+	lastUpdate    time.Time
+	anomalyAlerts []string
+	quitting      bool
 }
 
 type updateMsg struct{}
@@ -79,6 +81,7 @@ func processPacketForUI(packet gopacket.Packet) {
 	length := packet.Metadata().Length
 
 	var protocol, src, dst string
+	var dstPort int
 
 	if networkLayer == nil {
 		protocol = "Other"
@@ -92,6 +95,14 @@ func processPacketForUI(packet gopacket.Packet) {
 			protocol = "Other"
 		} else {
 			protocol = transportLayer.LayerType().String()
+
+			if tcpLayer, ok := transportLayer.(*layers.TCP); ok {
+				dstPort = int(tcpLayer.DstPort)
+			} else if udpLayer, ok := transportLayer.(*layers.UDP); ok {
+				dstPort = int(udpLayer.DstPort)
+			}
+
+			detector.Track(src, dstPort)
 		}
 	}
 
@@ -157,6 +168,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.bytesRate = float64(currentBytes-m.prevBytes) / duration
 		}
 
+		m.anomalyAlerts = GetActiveAlerts()
 		m.prevBytes = currentBytes
 		m.lastUpdate = now
 
@@ -187,10 +199,27 @@ func (m model) View() string {
 	}
 	stats.Unlock()
 
+	alertViews := ""
+	if len(m.anomalyAlerts) > 0 {
+		alertStyle := lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("9")).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("9")).
+			Padding(0, 1)
+
+		alerts := "🚨 Security Alerts:\n"
+		for _, alert := range m.anomalyAlerts {
+			alerts += "- " + alert + "\n"
+		}
+		alertViews = alertStyle.Render(alerts)
+	}
+
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
 		renderStats(total, m.bytesRate),
 		renderChart(statsCopy),
+		alertViews,
 		renderLogs(recentPackets),
 	)
 }

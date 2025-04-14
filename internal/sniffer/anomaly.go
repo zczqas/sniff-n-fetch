@@ -17,7 +17,14 @@ type AnomalyDetector struct {
 	activity map[string]*ipActivity
 }
 
+type AnomalyAlert struct {
+	Message   string
+	Timestamp time.Time
+}
+
 var detector = NewAnomalyDetector()
+var activeAlerts = []AnomalyAlert{}
+var alertsMutex sync.Mutex
 
 func NewAnomalyDetector() *AnomalyDetector {
 	d := &AnomalyDetector{
@@ -43,12 +50,16 @@ func (d *AnomalyDetector) Track(srcIP string, dstPort int) {
 	act.Ports[dstPort] = true
 	act.LastSeen = time.Now()
 
-	if act.PacketCount > 100 {
-		fmt.Printf("🚨 Flood detected from %s (packets: %d)\n", srcIP, act.PacketCount)
+	if act.PacketCount > 100 && act.PacketCount%100 == 0 {
+		message := fmt.Sprintf("Flood detected from %s (packets: %d)", srcIP, act.PacketCount)
+		fmt.Printf("🚨 %s\n", message)
+		AddAlert(message)
 	}
 
-	if len(act.Ports) > 50 {
-		fmt.Printf("🕵️ Port scan detected from %s (ports: %d)\n", srcIP, len(act.Ports))
+	if len(act.Ports) > 50 && len(act.Ports)%10 == 0 {
+		message := fmt.Sprintf("Port scan detected from %s (ports: %d)", srcIP, len(act.Ports))
+		fmt.Printf("🕵️ %s\n", message)
+		AddAlert(message)
 	}
 }
 
@@ -65,4 +76,34 @@ func (d *AnomalyDetector) cleanupLoop() {
 		}
 		d.mu.Unlock()
 	}
+}
+
+func GetActiveAlerts() []string {
+	alertsMutex.Lock()
+	defer alertsMutex.Unlock()
+
+	result := []string{}
+	now := time.Now()
+	newAlerts := []AnomalyAlert{}
+
+	for _, alert := range activeAlerts {
+		if now.Sub(alert.Timestamp) < 30*time.Second {
+			result = append(result, alert.Message)
+			newAlerts = append(newAlerts, alert)
+		}
+	}
+
+	activeAlerts = newAlerts
+
+	return result
+}
+
+func AddAlert(message string) {
+	alertsMutex.Lock()
+	defer alertsMutex.Unlock()
+
+	activeAlerts = append(activeAlerts, AnomalyAlert{
+		Message:   message,
+		Timestamp: time.Now(),
+	})
 }

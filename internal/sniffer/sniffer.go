@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
 )
 
@@ -51,6 +52,7 @@ func processPacket(packet gopacket.Packet) {
 	length := packet.Metadata().Length
 
 	var protocol, src, dst string
+	var dstPort int
 
 	if networkLayer == nil {
 		protocol = "Other"
@@ -64,6 +66,15 @@ func processPacket(packet gopacket.Packet) {
 			protocol = "Other"
 		} else {
 			protocol = transportLayer.LayerType().String()
+
+			// Get destinatin port if available
+			if tcpLayer, ok := transportLayer.(*layers.TCP); ok {
+				dstPort = int(tcpLayer.DstPort)
+			} else if udpLayer, ok := transportLayer.(*layers.UDP); ok {
+				dstPort = int(udpLayer.DstPort)
+			}
+
+			detector.Track(src, dstPort)
 		}
 	}
 
