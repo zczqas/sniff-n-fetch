@@ -8,7 +8,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
 )
 
@@ -75,36 +74,7 @@ func startSniffing(interfaceName, filter string) {
 }
 
 func processPacketForUI(packet gopacket.Packet) {
-	networkLayer := packet.NetworkLayer()
-	transportLayer := packet.TransportLayer()
-	timestamp := packet.Metadata().Timestamp.Format("15:04:05")
-	length := packet.Metadata().Length
-
-	var protocol, src, dst string
-	var dstPort int
-
-	if networkLayer == nil {
-		protocol = "Other"
-		src = "unknown"
-		dst = "unknown"
-	} else {
-		src = networkLayer.NetworkFlow().Src().String()
-		dst = networkLayer.NetworkFlow().Dst().String()
-
-		if transportLayer == nil {
-			protocol = "Other"
-		} else {
-			protocol = transportLayer.LayerType().String()
-
-			if tcpLayer, ok := transportLayer.(*layers.TCP); ok {
-				dstPort = int(tcpLayer.DstPort)
-			} else if udpLayer, ok := transportLayer.(*layers.UDP); ok {
-				dstPort = int(udpLayer.DstPort)
-			}
-
-			detector.Track(src, dstPort)
-		}
-	}
+	timestamp, protocol, src, dst, length := extractPacketInfo(packet, true)
 
 	stats.Lock()
 	defer stats.Unlock()

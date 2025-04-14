@@ -45,10 +45,17 @@ func Start(interfaceName, filter string) {
 	}
 }
 
-func processPacket(packet gopacket.Packet) {
+func extractPacketInfo(packet gopacket.Packet, shortTimestamp bool) (string, string, string, string, int) {
 	networkLayer := packet.NetworkLayer()
 	transportLayer := packet.TransportLayer()
-	timestamp := packet.Metadata().Timestamp.Format(time.RFC3339)
+
+	var timestamp string
+	if shortTimestamp {
+		timestamp = packet.Metadata().Timestamp.Format("15:04:05")
+	} else {
+		timestamp = packet.Metadata().Timestamp.Format(time.RFC3339)
+	}
+
 	length := packet.Metadata().Length
 
 	var protocol, src, dst string
@@ -67,7 +74,6 @@ func processPacket(packet gopacket.Packet) {
 		} else {
 			protocol = transportLayer.LayerType().String()
 
-			// Get destinatin port if available
 			if tcpLayer, ok := transportLayer.(*layers.TCP); ok {
 				dstPort = int(tcpLayer.DstPort)
 			} else if udpLayer, ok := transportLayer.(*layers.UDP); ok {
@@ -77,6 +83,12 @@ func processPacket(packet gopacket.Packet) {
 			detector.Track(src, dstPort)
 		}
 	}
+
+	return timestamp, protocol, src, dst, length
+}
+
+func processPacket(packet gopacket.Packet) {
+	timestamp, protocol, src, dst, length := extractPacketInfo(packet, false)
 
 	stats.Lock()
 	stats.Total++
