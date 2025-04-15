@@ -27,6 +27,7 @@ type model struct {
 	bytesRate     float64
 	lastUpdate    time.Time
 	anomalyAlerts []string
+	ipDomains     map[string]string
 	quitting      bool
 }
 
@@ -42,6 +43,7 @@ func StartUI(interfaceName, filter string) {
 		prevBytes:  0,
 		bytesRate:  0,
 		lastUpdate: time.Now(),
+		ipDomains:  make(map[string]string),
 	}
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
@@ -108,6 +110,7 @@ func processPacketForUI(packet gopacket.Packet) {
 }
 
 func (m model) Init() tea.Cmd {
+	m.ipDomains = make(map[string]string)
 	return tea.Tick(time.Second, func(_ time.Time) tea.Msg {
 		return updateMsg{}
 	})
@@ -139,6 +142,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		m.anomalyAlerts = GetActiveAlerts()
+
+		stats.Lock()
+		for _, packet := range stats.recent {
+			if packet.Src != "" && packet.Src != "unknown" {
+				if _, exists := m.ipDomains[packet.Src]; !exists {
+					domain := LookupDomain(packet.Src)
+					if domain != "unknown" && domain != "local" {
+						m.ipDomains[packet.Src] = domain
+					} else {
+						m.ipDomains[packet.Src] = domain
+					}
+				}
+			}
+		}
+		stats.Unlock()
+
 		m.prevBytes = currentBytes
 		m.lastUpdate = now
 
@@ -169,7 +188,7 @@ func (m model) View() string {
 	}
 	stats.Unlock()
 
-	alertViews := ""
+	alertsView := ""
 	if len(m.anomalyAlerts) > 0 {
 		alertStyle := lipgloss.NewStyle().
 			Bold(true).
@@ -182,14 +201,44 @@ func (m model) View() string {
 		for _, alert := range m.anomalyAlerts {
 			alerts += "- " + alert + "\n"
 		}
-		alertViews = alertStyle.Render(alerts)
+		alertsView = alertStyle.Render(alerts)
 	}
+
+	domainInfoView := renderDomainInfo(m.ipDomains)
 
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
 		renderStats(total, m.bytesRate),
 		renderChart(statsCopy),
-		alertViews,
+		alertsView,
+		domainInfoView,
 		renderLogs(recentPackets),
 	)
+}
+
+func renderDomainInfo(ipDomains map[string]string) string {
+	if len(ipDomains) == 0 {
+		return ""
+	}
+
+	domainStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("12")).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("12")).
+		Padding(0, 1)
+
+	content := "🔍 Domain Resolutions:\n"
+	count := 0
+	for ip, domain := range ipDomains {
+		if domain != "unknown" && domain != "local" {
+			content += fmt.Sprintf("- %s: %s\n", ip, domain)
+			count++
+		}
+		if count >= 5 {
+			break
+		}
+	}
+
+	return domainStyle.Render(content)
 }
