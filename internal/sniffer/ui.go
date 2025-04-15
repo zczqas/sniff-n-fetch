@@ -28,22 +28,30 @@ type model struct {
 	lastUpdate    time.Time
 	anomalyAlerts []string
 	ipDomains     map[string]string
+	ipCountries   map[string]CountryInfo
 	quitting      bool
 }
 
 type updateMsg struct{}
 
 func StartUI(interfaceName, filter string) {
+	// Initialize GeoIP
+	if err := InitGeoIP(); err != nil {
+		log.Printf("warning: GeoIP initialization failed: %v", err)
+	}
+	defer CloseGeoIP()
+
 	stats = &Stats{
 		recent: make([]packetEntry, 0, 10),
 	}
 
 	m := model{
-		stats:      stats,
-		prevBytes:  0,
-		bytesRate:  0,
-		lastUpdate: time.Now(),
-		ipDomains:  make(map[string]string),
+		stats:       stats,
+		prevBytes:   0,
+		bytesRate:   0,
+		lastUpdate:  time.Now(),
+		ipDomains:   make(map[string]string),
+		ipCountries: make(map[string]CountryInfo),
 	}
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
@@ -154,6 +162,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.ipDomains[packet.Src] = domain
 					}
 				}
+
+				if _, exists := m.ipCountries[packet.Src]; !exists {
+					country := LookupCountry(packet.Src)
+					m.ipCountries[packet.Src] = country
+				}
+			}
+
+			if packet.Dst != "" && packet.Dst != "unknown" {
+				if _, exists := m.ipCountries[packet.Dst]; !exists {
+					country := LookupCountry(packet.Dst)
+					m.ipCountries[packet.Dst] = country
+				}
 			}
 		}
 		stats.Unlock()
@@ -205,12 +225,14 @@ func (m model) View() string {
 	}
 
 	domainInfoView := renderDomainInfo(m.ipDomains)
+	countryInfoView := renderCountries(m.ipCountries)
 
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
 		renderStats(total, m.bytesRate),
 		renderChart(statsCopy),
 		alertsView,
+		countryInfoView,
 		domainInfoView,
 		renderLogs(recentPackets),
 	)

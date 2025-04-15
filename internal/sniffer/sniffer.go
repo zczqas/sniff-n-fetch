@@ -11,6 +11,12 @@ import (
 )
 
 func Start(interfaceName, filter string) {
+	// Initialize GeoIP
+	if err := InitGeoIP(); err != nil {
+		log.Printf("warning: GeoIP initialization failed: %v", err)
+	}
+	defer CloseGeoIP()
+
 	handle, err := pcap.OpenLive(interfaceName, 1600, true, pcap.BlockForever)
 	if err != nil {
 		log.Fatalf("error opening device: %v", err)

@@ -18,9 +18,10 @@ type AnomalyDetector struct {
 }
 
 type AnomalyAlert struct {
-	Message   string
-	IP        string
-	Timestamp time.Time
+	Message     string
+	IP          string
+	CountryInfo CountryInfo
+	Timestamp   time.Time
 }
 
 var detector = NewAnomalyDetector()
@@ -51,6 +52,8 @@ func (d *AnomalyDetector) Track(srcIP string, dstPort int) {
 	act.Ports[dstPort] = true
 	act.LastSeen = time.Now()
 
+	country := LookupCountry(srcIP)
+
 	if act.PacketCount > 100 && act.PacketCount%100 == 0 {
 		domain := LookupDomain(srcIP)
 
@@ -61,7 +64,7 @@ func (d *AnomalyDetector) Track(srcIP string, dstPort int) {
 
 		message := fmt.Sprintf("Flood detected from %s%s (packets: %d)", srcIP, infoStr, act.PacketCount)
 		fmt.Printf("🚨 %s\n", message)
-		AddAlert(message, srcIP)
+		AddAlert(message, srcIP, country)
 	}
 
 	if len(act.Ports) > 50 && len(act.Ports)%10 == 0 {
@@ -73,7 +76,7 @@ func (d *AnomalyDetector) Track(srcIP string, dstPort int) {
 		}
 		message := fmt.Sprintf("Port scan detected from %s%s (ports: %d)", srcIP, infoStr, len(act.Ports))
 		fmt.Printf("🕵️ %s\n", message)
-		AddAlert(message, srcIP)
+		AddAlert(message, srcIP, country)
 	}
 }
 
@@ -112,13 +115,14 @@ func GetActiveAlerts() []string {
 	return result
 }
 
-func AddAlert(message string, ip string) {
+func AddAlert(message string, ip string, country CountryInfo) {
 	alertsMutex.Lock()
 	defer alertsMutex.Unlock()
 
 	activeAlerts = append(activeAlerts, AnomalyAlert{
-		Message:   message,
-		IP:        ip,
-		Timestamp: time.Now(),
+		Message:     message,
+		IP:          ip,
+		CountryInfo: country,
+		Timestamp:   time.Now(),
 	})
 }

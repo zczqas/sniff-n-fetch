@@ -2,6 +2,7 @@ package sniffer
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -53,6 +54,69 @@ func renderLogs(entries []packetEntry) string {
 		logBlock += fmt.Sprintf("[%s] %s | %s → %s (%d bytes)\n", e.Timestamp, e.Protocol, e.Src, e.Dst, e.Length)
 	}
 	return logBlock
+}
+
+func renderCountries(countries map[string]CountryInfo) string {
+	if len(countries) == 0 {
+		return ""
+	}
+
+	countryStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("14")).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("14")).
+		Padding(0, 1)
+
+	countryCount := make(map[string]int)
+	countryDetails := make(map[string]CountryInfo)
+
+	for _, info := range countries {
+		if info.ISO != "" && info.ISO != "XX" && info.ISO != "LO" {
+			countryCount[info.ISO]++
+			countryDetails[info.ISO] = info
+		}
+	}
+
+	type countryStat struct {
+		ISO   string
+		Info  CountryInfo
+		Count int
+	}
+
+	var stats []countryStat
+	for iso, count := range countryCount {
+		stats = append(stats, countryStat{
+			ISO:   iso,
+			Info:  countryDetails[iso],
+			Count: count,
+		})
+	}
+
+	sort.Slice(stats, func(i, j int) bool {
+		return stats[i].Count > stats[j].Count
+	})
+
+	content := "🌎 Countries Detected:\n"
+	displayCount := 0
+
+	for _, stat := range stats {
+		if stat.Info.Name != "" && stat.Info.Name != "Unknown" && stat.Info.Name != "Local Network" {
+			content += fmt.Sprintf("- %s %s (%d connections)\n",
+				stat.Info.Flag, stat.Info.Name, stat.Count)
+			displayCount++
+		}
+
+		if displayCount >= 5 {
+			break
+		}
+	}
+
+	if displayCount == 0 {
+		return ""
+	}
+
+	return countryStyle.Render(content)
 }
 
 func strRepeat(s string, count int) string {
