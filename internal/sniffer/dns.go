@@ -1,6 +1,7 @@
 package sniffer
 
 import (
+	"fmt"
 	"net"
 	"strings"
 	"sync"
@@ -24,6 +25,10 @@ func LookupDomain(ipStr string) string {
 	dnsCacheMutex.Lock()
 	if domain, found := dnsCache[ipStr]; found {
 		dnsCacheMutex.Unlock()
+		country := LookupCountry(ipStr)
+		if country.ISO != "XX" && country.ISO != "LO" {
+			return fmt.Sprintf("%s (%s %s)", domain, country.Flag, country.Name)
+		}
 		return domain
 	}
 	dnsCacheMutex.Unlock()
@@ -44,8 +49,11 @@ func LookupDomain(ipStr string) string {
 		dnsCacheMutex.Lock()
 		dnsCache[ipStr] = domain
 		dnsCacheMutex.Unlock()
+		country := LookupCountry(ipStr)
+		if country.ISO != "XX" && country.ISO != "LO" {
+			return fmt.Sprintf("%s (%s %s)", domain, country.Flag, country.Name)
+		}
 	case <-time.After(500 * time.Millisecond):
-
 	}
 
 	return domain

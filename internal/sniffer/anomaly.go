@@ -56,25 +56,14 @@ func (d *AnomalyDetector) Track(srcIP string, dstPort int) {
 
 	if act.PacketCount > 100 && act.PacketCount%100 == 0 {
 		domain := LookupDomain(srcIP)
-
-		var infoStr string
-		if domain != "unknown" && domain != "local" {
-			infoStr = fmt.Sprintf(" (%s)", domain)
-		}
-
-		message := fmt.Sprintf("Flood detected from %s%s (packets: %d)", srcIP, infoStr, act.PacketCount)
+		message := fmt.Sprintf("Flood detected from %s (packets: %d)", domain, act.PacketCount)
 		fmt.Printf("🚨 %s\n", message)
 		AddAlert(message, srcIP, country)
 	}
 
 	if len(act.Ports) > 50 && len(act.Ports)%10 == 0 {
 		domain := LookupDomain(srcIP)
-
-		var infoStr string
-		if domain != "unknown" && domain != "local" {
-			infoStr = fmt.Sprintf(" (%s)", domain)
-		}
-		message := fmt.Sprintf("Port scan detected from %s%s (ports: %d)", srcIP, infoStr, len(act.Ports))
+		message := fmt.Sprintf("Port scan detected from %s (ports: %d)", domain, len(act.Ports))
 		fmt.Printf("🕵️ %s\n", message)
 		AddAlert(message, srcIP, country)
 	}
