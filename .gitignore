@@ -29,4 +29,8 @@ go.sum
 go.work
 go.work.sum
 
+# GeoIP databases
 *.mmdb
+
+# Commands
+commands.md
