@@ -80,12 +80,12 @@ func LookupCountry(ipStr string) CountryInfo {
 		return CountryInfo{Name: "Unknown", ISO: "XX", Flag: "🏴"}
 	}
 
-	ip := net.ParseIP(cleanIPString(ipStr))
+	ip := net.ParseIP(CleanIPString(ipStr))
 	if ip == nil {
 		return CountryInfo{Name: "Invalid IP", ISO: "XX", Flag: "🏴"}
 	}
 
-	if isPrivateIP(ip) {
+	if IsPrivateIP(ip) {
 		return CountryInfo{Name: "Local Network", ISO: "LO", Flag: "🏠"}
 	}
 
@@ -101,14 +101,14 @@ func LookupCountry(ipStr string) CountryInfo {
 	country := CountryInfo{
 		Name: record.Country.Names["en"],
 		ISO:  record.Country.IsoCode,
-		Flag: getEmojiFlag(record.Country.IsoCode),
+		Flag: GetEmojiFlag(record.Country.IsoCode),
 	}
 
 	countryInfo[ipStr] = country
 	return country
 }
 
-func cleanIPString(ipStr string) string {
+func CleanIPString(ipStr string) string {
 	host, _, err := net.SplitHostPort(ipStr)
 	if err != nil {
 		// If error, the IP likely doesn't have a port
@@ -117,7 +117,7 @@ func cleanIPString(ipStr string) string {
 	return host
 }
 
-func getEmojiFlag(isoCode string) string {
+func GetEmojiFlag(isoCode string) string {
 	if isoCode == "" {
 		return "🏴"
 	}

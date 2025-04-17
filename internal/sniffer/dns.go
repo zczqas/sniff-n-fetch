@@ -18,7 +18,7 @@ func LookupDomain(ipStr string) string {
 	ipStr = ipParts[0]
 
 	ip := net.ParseIP(ipStr)
-	if ip != nil && isPrivateIP(ip) {
+	if ip != nil && IsPrivateIP(ip) {
 		return "local"
 	}
 
@@ -59,7 +59,7 @@ func LookupDomain(ipStr string) string {
 	return domain
 }
 
-func isPrivateIP(ip net.IP) bool {
+func IsPrivateIP(ip net.IP) bool {
 	if ip4 := ip.To4(); ip4 != nil {
 		switch {
 		case ip4[0] == 10:
