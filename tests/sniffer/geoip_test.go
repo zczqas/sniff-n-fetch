@@ -1,6 +1,7 @@
 package sniffer_test
 
 import (
+	"os"
 	"testing"
 
 	"github.com/zczqas/sniff-n-fetch/internal/sniffer"
@@ -121,5 +122,11 @@ func TestGetEmojiFlag(t *testing.T) {
 				t.Errorf("getEmojiFlag(%q) = %q, want %q", tt.isoCode, result, tt.expected)
 			}
 		})
+	}
+}
+
+func TestRemoveGeoIPDatabase(t *testing.T) {
+	if err := os.Remove("GeoLite2-Country.mmdb"); err != nil {
+		t.Fatalf("failed to remove GeoIP database: %v", err)
 	}
 }
