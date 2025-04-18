@@ -16,7 +16,7 @@ A network packet sniffer built in Go with real-time analysis capabilities.
 
 ### Prerequisites
 
-- Go 1.21 or higher
+- Go 1.24 or higher
 - libpcap development files
 
 #### Ubuntu/Debian
