@@ -10,7 +10,7 @@ import (
 	"github.com/google/gopacket/pcap"
 )
 
-func Start(interfaceName, filter string) {
+func Start(interfaceName, filter, saveFile string, maxPackets int) {
 	// Initialize GeoIP
 	if err := InitGeoIP(); err != nil {
 		log.Printf("warning: GeoIP initialization failed: %v", err)
@@ -35,6 +35,20 @@ func Start(interfaceName, filter string) {
 	fmt.Println("starting packet capture...")
 	stats = &Stats{}
 
+	var saver *PacketSaver
+	if saveFile != "" {
+		saver, err = NewPacketSaver(saveFile, 65536, maxPackets)
+		if err != nil {
+			log.Fatalf("failed to create packet saver: %v", err)
+		}
+		defer saver.Close()
+
+		fmt.Printf("Saving packets to %s (max packets: %d)\n",
+			saveFile,
+			maxPackets,
+		)
+	}
+
 	// Start stats display in a goroutine
 	go func() {
 		prevBytes := 0
@@ -43,11 +57,22 @@ func Start(interfaceName, filter string) {
 		for {
 			time.Sleep(interval)
 			prevBytes = stats.PrintRateAndPieChart(prevBytes, interval)
+
+			if saver != nil {
+				count, _ := saver.GetStats()
+				fmt.Printf("Saved packets: %d\n", count)
+			}
 		}
 	}()
 
 	for packet := range packetSource.Packets() {
 		processPacket(packet)
+
+		if saver != nil {
+			if err := saver.SavePacket(packet); err != nil {
+				log.Printf("error saving packet: %v", err)
+			}
+		}
 	}
 }
 

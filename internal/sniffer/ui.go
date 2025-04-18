@@ -11,6 +11,8 @@ import (
 	"github.com/google/gopacket/pcap"
 )
 
+var packetSaver *PacketSaver
+
 type packetEntry struct {
 	Timestamp string
 	Protocol  string
@@ -29,12 +31,14 @@ type model struct {
 	anomalyAlerts []string
 	ipDomains     map[string]string
 	ipCountries   map[string]CountryInfo
+	savedPackets  int
+	saveFile      string
 	quitting      bool
 }
 
 type updateMsg struct{}
 
-func StartUI(interfaceName, filter string) {
+func StartUI(interfaceName, filter, saveFile string, maxPackets int) {
 	// Initialize GeoIP
 	if err := InitGeoIP(); err != nil {
 		log.Printf("warning: GeoIP initialization failed: %v", err)
@@ -56,14 +60,14 @@ func StartUI(interfaceName, filter string) {
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
 
-	go startSniffing(interfaceName, filter)
+	go startSniffing(interfaceName, filter, saveFile, maxPackets)
 
 	if err := p.Start(); err != nil {
 		fmt.Println("error starting UI:", err)
 	}
 }
 
-func startSniffing(interfaceName, filter string) {
+func startSniffing(interfaceName, filter, saveFile string, maxPackets int) {
 	handle, err := pcap.OpenLive(interfaceName, 1600, true, pcap.BlockForever)
 	if err != nil {
 		log.Fatalf("error opening device: %v", err)
@@ -76,10 +80,24 @@ func startSniffing(interfaceName, filter string) {
 		}
 	}
 
+	if saveFile != "" {
+		packetSaver, err = NewPacketSaver(saveFile, 65536, maxPackets)
+		if err != nil {
+			log.Fatalf("failed to create packet saver: %v", err)
+		}
+		defer packetSaver.Close()
+	}
+
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 
 	for packet := range packetSource.Packets() {
 		processPacketForUI(packet)
+
+		if packetSaver != nil {
+			if err := packetSaver.SavePacket(packet); err != nil {
+				log.Printf("error saving packet: %v", err)
+			}
+		}
 	}
 }
 
@@ -178,6 +196,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		stats.Unlock()
 
+		if packetSaver != nil {
+			m.savedPackets, m.saveFile = packetSaver.GetStats()
+		}
+
 		m.prevBytes = currentBytes
 		m.lastUpdate = now
 
@@ -224,6 +246,20 @@ func (m model) View() string {
 		alertsView = alertStyle.Render(alerts)
 	}
 
+	saveView := ""
+	if m.saveFile != "" {
+		saveStyle := lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("5")).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("5")).
+			Padding(0, 1)
+
+		saveInfo := fmt.Sprintf("💾 Saving Packets: %d packets saved to %s",
+			m.savedPackets, m.saveFile)
+		saveView = saveStyle.Render(saveInfo)
+	}
+
 	domainInfoView := renderDomainInfo(m.ipDomains)
 	countryInfoView := renderCountries(m.ipCountries)
 
@@ -231,6 +267,7 @@ func (m model) View() string {
 		lipgloss.Left,
 		renderStats(total, m.bytesRate),
 		renderChart(statsCopy),
+		saveView,
 		alertsView,
 		countryInfoView,
 		domainInfoView,

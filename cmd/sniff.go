@@ -16,9 +16,9 @@ var sniffCmd = &cobra.Command{
 	Short: "Start sniffing packets on a network interface",
 	Run: func(cmd *cobra.Command, args []string) {
 		if useUI {
-			sniffer.StartUI(interfaceName, filter)
+			sniffer.StartUI(interfaceName, filter, saveFile, maxPackets)
 		} else {
-			sniffer.Start(interfaceName, filter)
+			sniffer.Start(interfaceName, filter, saveFile, maxPackets)
 		}
 	},
 }
