@@ -8,6 +8,8 @@ import (
 var interfaceName string
 var filter string
 var useUI bool
+var saveFile string
+var maxPackets int
 
 var sniffCmd = &cobra.Command{
 	Use:   "sniff",
@@ -41,6 +43,18 @@ func init() {
 		"ui",
 		false,
 		"Display live terminal UI",
+	)
+	sniffCmd.Flags().StringVar(
+		&saveFile,
+		"save",
+		"",
+		"Save captured packets to a pcap file",
+	)
+	sniffCmd.Flags().IntVar(
+		&maxPackets,
+		"max-packets",
+		0,
+		"Maximum number of packets to capture (0 for unlimited)",
 	)
 	rootCmd.AddCommand(sniffCmd)
 }
