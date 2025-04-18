@@ -34,3 +34,6 @@ go.work.sum
 
 # Commands
 commands.md
+
+# .pcap files
+*.pcap

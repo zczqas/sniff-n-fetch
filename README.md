@@ -90,6 +90,26 @@ Examples:
 ./bin/sniffer sniff -i eth0 -f "host 192.168.1.1"
 ```
 
+### Saving Packets to PCAP File
+
+Save captured packets to a standard .pcap file that can be opened with tools like Wireshark:
+
+```sh 
+./bin/sniffer sniff -i <interface_name> --save <output_file.pcap>
+```
+
+Examples:
+```sh
+# Save all packets to a file
+./bin/sniffer sniff -i eth0 --save capture.pcap
+
+# Save filtered packets and limit capture to 1000 packets
+./bin/sniffer sniff -i eth0 -f "tcp port 80" --save http_traffic.pcap --max-packets 1000
+
+# Save packets while using the UI
+./bin/sniffer sniff -i eth0 --save capture.pcap --ui
+```
+
 ### Interactive Terminal UI
 
 Run with the interactive terminal UI for real-time visualizations:
