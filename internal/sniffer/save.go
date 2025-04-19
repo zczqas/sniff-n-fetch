@@ -71,8 +71,13 @@ func (ps *PacketSaver) SavePacket(packet gopacket.Packet) error {
 
 	ps.count++
 
-	if ps.maxPackets > 0 && ps.count >= ps.maxPackets {
-		ps.Close()
+	shouldClose := ps.maxPackets > 0 && ps.count >= ps.maxPackets
+	if shouldClose {
+		if ps.file != nil {
+			_ = ps.file.Close()
+			ps.file = nil
+			ps.dumper = nil
+		}
 		log.Printf("Reached max packet count (%d). Saved tp %s", ps.maxPackets, ps.filename)
 	}
 
